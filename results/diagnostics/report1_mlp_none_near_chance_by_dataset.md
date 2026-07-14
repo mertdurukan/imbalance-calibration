@@ -1,0 +1,14 @@
+# Report 1 — mlp/none replicates with AUROC < 0.6, by dataset & event rate
+
+| dataset_id | dataset_name | event_rate | n_replicates | n_near_chance | auroc_min | auroc_max |
+| --- | --- | --- | --- | --- | --- | --- |
+| 40983 | wilt | 0.0539 | 25 | 13 | 0.3851 | 0.9978 |
+| 38 | sick | 0.0612 | 25 | 0 | 0.9126 | 0.9817 |
+| 1487 | ozone-level-8hr | 0.0631 | 25 | 4 | 0.4366 | 0.9523 |
+| 1461 | bank-marketing | 0.1170 | 25 | 0 | 0.9009 | 0.9298 |
+| 40978 | Internet-Advertisements | 0.1400 | 25 | 0 | 0.9539 | 0.9918 |
+| 40701 | churn | 0.1414 | 25 | 0 | 0.8717 | 0.9349 |
+| 1067 | kc1 | 0.1546 | 25 | 0 | 0.6989 | 0.8476 |
+| 1053 | jm1 | 0.1935 | 25 | 0 | 0.6810 | 0.7478 |
+
+> n_near_chance = replicates (of n_replicates) with AUROC < 0.6. Sorted by event_rate ascending.
