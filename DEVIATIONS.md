@@ -43,3 +43,22 @@ Format:
 - **Bookkeeping disclosure:** A DEVIATIONS.md entry describing the broadened pool was written and then deleted from the working tree before it was ever committed, so no git history was rewritten. Rather than reconstruct that deleted text and pass it off as the contemporaneous record, the full excursion is disclosed here in a single entry. Nothing about the excursion is concealed.
 - **Decided:** BEFORE any model was fit. No experimental results existed at any point during this excursion.
 - **Impact on hypotheses:** none. Breadth of generalisation is limited to 8 datasets; to be reported as a limitation.
+
+## 2026-07-14 — Provenance: src/runner.py authored by an unattributed process
+- **What happened:** src/runner.py appeared in the working tree during the Task 4 session, authored by a process other than the reviewing agent (most likely a background subagent). Authorship cannot be attributed with certainty.
+- **Why it was kept:** the file passes tests/test_runner_leakage.py, whose ability to DETECT a leak was independently proven by a mutation test (a deliberately leaky run_cell was rejected with max sentinel id 10191.0 >= 10000). The guarantee rests on the proven test, not on the authorship of the code.
+- **Action:** audited line-by-line against SPEC §3–§5 before any results were used. Audit recorded in the repository.
+- **Decided:** BEFORE any results were used.
+- **Impact on hypotheses:** none.
+
+## 2026-07-14 — Data limitation: all-missing `TBG` column in dataset 38 `sick`
+- **What happened:** OpenML dataset 38 (`sick`) contains a feature column `TBG` that is entirely missing (all-NaN). Median imputation cannot impute a column with no observed values, so `SimpleImputer` (default `keep_empty_features=False`) drops it inside the CV pipeline, emitting a `UserWarning` on every fit.
+- **Action:** the fact is logged ONCE per (dataset, column) in `src/runner.py` (`_log_all_nan_columns`) and the repeated `SimpleImputer` warning is suppressed at fit time only (narrowly, by message + `UserWarning`) to keep the ~3,000-cell run readable. The column is NOT dropped by our code and is NOT silently excluded (.cursorrules #3); the drop is the imputer's documented behaviour and is disclosed here.
+- **Decided:** BEFORE any results were used.
+- **Impact on hypotheses:** none. To be reported in the paper's limitations (dataset 38 effectively has one fewer usable feature).
+
+## 2026-07-14 — Results-directory hygiene (engineering, pre-results)
+- **Changed:** (a) tests now write to a temporary directory; a test artifact (dataset_id 999999, from the leakage test's synthetic dataset) had been written into results/cells/ and would have been reported as a failed experimental cell. (b) Per-item probability files moved from results/cells/{cid}.yprob.parquet to results/yprob/{cid}.parquet, because the shared glob namespace silently mixed them with cell results.
+- **Reason:** both defects would have corrupted the analysis without raising an error.
+- **Decided:** BEFORE any experimental results were used. Only a pilot had been run, and it was discarded and re-run after the fix. No hypothesis-relevant number was inspected before deciding.
+- **Impact on hypotheses:** none.
