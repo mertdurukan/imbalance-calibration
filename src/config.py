@@ -28,6 +28,29 @@ CONDITIONS: Final[list[str]] = ["none", "rus", "ros", "smote"]
 # "none_threshold" is NOT a fit condition — it reuses "none" predictions.
 # It is applied at analysis time only. See METRICS.md §4.
 
+# Fixed model hyperparameters (PREREG §4.2, SPEC §3). NO TUNING ANYWHERE.
+# These are frozen values, not search spaces. A literal number in models.py is a
+# bug (SPEC §2) — every hyperparameter is referenced from here.
+LOGREG_MAX_ITER: Final[int] = 5000
+
+XGB_N_ESTIMATORS: Final[int] = 500
+XGB_LEARNING_RATE: Final[float] = 0.05
+XGB_MAX_DEPTH: Final[int] = 6
+XGB_SUBSAMPLE: Final[float] = 0.8
+XGB_COLSAMPLE_BYTREE: Final[float] = 0.8
+XGB_EVAL_METRIC: Final[str] = "logloss"
+XGB_TREE_METHOD: Final[str] = "hist"
+# scale_pos_weight is deliberately NOT set — class-weighting is out of scope (PREREG §6).
+
+MLP_HIDDEN_LAYER_SIZES: Final[tuple[int, int]] = (64, 32)
+MLP_EARLY_STOPPING: Final[bool] = True
+MLP_MAX_ITER: Final[int] = 500
+
+# Preprocessing / resampling condition parameters (PREREG §4.3, SPEC §3).
+IMPUTER_STRATEGY: Final[str] = "median"
+RESAMPLE_SAMPLING_STRATEGY: Final[float] = 1.0  # balance minority:majority to 1:1
+SMOTE_K_NEIGHBORS: Final[int] = 5
+
 ECE_N_BINS: Final[int] = 15
 NET_BENEFIT_THRESHOLDS: Final[list[float]] = [0.05, 0.10, 0.20]  # + event rate, computed per dataset
 BOOTSTRAP_N: Final[int] = 2_000
