@@ -62,3 +62,17 @@ Format:
 - **Reason:** both defects would have corrupted the analysis without raising an error.
 - **Decided:** BEFORE any experimental results were used. Only a pilot had been run, and it was discarded and re-run after the fix. No hypothesis-relevant number was inspected before deciding.
 - **Impact on hypotheses:** none.
+
+## 2026-07-14 — H1 FAIL for MLP: diagnosis (no design change)
+- **Observation:** H1 (|ΔAUROC| < 0.01) FAILED for mlp: ros +0.055, smote +0.049. The 95% intervals span ~0.5, and mlp/none shows negative calibration slopes in some replicates — indicating a collapsing baseline rather than a genuine improvement from resampling.
+- **Action taken:** DIAGNOSIS ONLY. No hyperparameter, model, or exclusion rule was changed. MLP remains in the study exactly as pre-registered, with early_stopping=True as specified in PREREG §4.2.
+- **Why nothing was changed:** modifying the MLP configuration after seeing that it failed would be a results-dependent design change — precisely what this pre-registration exists to prevent. The failure is reported as a finding, not engineered away.
+- **Decided:** AFTER seeing results. Disclosed as such.
+- **Impact on hypotheses:** H1 is reported as FAILED for MLP in Table 1. The diagnosis is reported as an exploratory finding and as a limitation of the pre-registered MLP specification.
+
+## 2026-07-14 — MLP early-stopping mechanism verification (read-only, no design change)
+- **What was done:** Added `scripts/verify_mlp_mechanism.py`, a read-only diagnostic that EXACTLY reproduces (same dataset, same `StratifiedKFold(shuffle=True, random_state=seed)` split & fold, same frozen `make_pipeline`/hyperparameters from `src/config.py`) the 17 broken `mlp/none` replicates (frozen AUROC < 0.6), the 17 matched `mlp/SMOTE` replicates, and all 25 `mlp/none` replicates on the high-event-rate control dataset jm1 (1053). For each it records `MLPClassifier.n_iter_`, `best_validation_score_`, and the held-out predicted-probability distribution (min/max/mean/std). Output: `results/diagnostics/report6..report9`.
+- **Why it is not a deviation from PREREG:** no hyperparameter, model, condition, split, seed, or exclusion rule was changed; the refits are in-memory and discarded, and NOTHING was written to `results/results.parquet`, `results/cells/`, or `results/yprob/`. The reproduced held-out AUROC equals the frozen value in all 42 checked cells (exact match), confirming these are reproductions of the frozen run, not new fits. This diagnostic does not feed the pre-registered H1/H2/H3 tables.
+- **Ordering note:** the pre-registered Tables 1–3 (`src/analyze.py`) were regenerated and reported to the author BEFORE this mechanism diagnostic was discussed, correcting the earlier ordering in which diagnostics were seen first.
+- **Decided:** AFTER seeing results. Disclosed as such.
+- **Impact on hypotheses:** none. The pre-registered result stands exactly as computed; this diagnostic explains the MLP H1 FAIL, it does not replace it. The post-hoc exclusion recompute remains EXPLORATORY and clearly labelled (`scripts/diagnose_mlp.py` Report 5).

@@ -1,0 +1,4 @@
+model,contrast,n_pairs_kept,delta_auroc_mean_[95%],H1_recomputed (|ΔAUROC|<0.01)
+mlp,rus - none,183,"-0.0142 [-0.1160, 0.1624]",FAIL
+mlp,ros - none,183,"0.0148 [-0.0392, 0.2863]",FAIL
+mlp,smote - none,183,"0.0087 [-0.0468, 0.2881]",PASS

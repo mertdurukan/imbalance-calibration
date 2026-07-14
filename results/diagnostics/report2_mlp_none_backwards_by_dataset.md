@@ -1,0 +1,14 @@
+# Report 2 — mlp/none replicates with cal_slope < 0, by dataset & event rate
+
+| dataset_id | dataset_name | event_rate | n_replicates | n_slope_lt_0 | cal_slope_min | cal_slope_max |
+| --- | --- | --- | --- | --- | --- | --- |
+| 40983 | wilt | 0.0539 | 25 | 6 | -0.990 | 4.149 |
+| 38 | sick | 0.0612 | 25 | 0 | 0.668 | 1.541 |
+| 1487 | ozone-level-8hr | 0.0631 | 25 | 0 | 0.023 | 1.175 |
+| 1461 | bank-marketing | 0.1170 | 25 | 0 | 0.797 | 1.071 |
+| 40978 | Internet-Advertisements | 0.1400 | 25 | 0 | 0.538 | 1.333 |
+| 40701 | churn | 0.1414 | 25 | 0 | 0.759 | 1.134 |
+| 1067 | kc1 | 0.1546 | 25 | 0 | 0.737 | 2.963 |
+| 1053 | jm1 | 0.1935 | 25 | 0 | 0.741 | 1.236 |
+
+> n_slope_lt_0 = replicates (of n_replicates) with cal_slope < 0. Sorted by event_rate ascending.
