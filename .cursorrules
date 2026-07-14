@@ -48,3 +48,9 @@ frozen in `PREREG.md`. Your job is to implement it exactly, not to improve it.
 
 Stop and ask. Do not guess a design decision. A wrong guess here contaminates a
 scientific result, which is worse than a delay.
+
+8. **NEVER rewrite git history.** No rebase, no soft-reset of committed work, no
+   force-push, no amend of an existing commit. The audit trail IS the scientific
+   artifact — the pre-registration commit is only credible because its timestamp is
+   untouched. If a commit message is inaccurate, correct it in a FOLLOWING commit,
+   never by editing the past. Messy-but-honest history beats clean-but-rewritten.
