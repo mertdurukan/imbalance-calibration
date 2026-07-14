@@ -34,10 +34,20 @@ exactly these signatures. Do not restructure.
 │   ├── test_metrics.py        # contract: metrics match known-answer cases
 │   └── test_config.py         # contract: no tuning, seeds fixed
 └── results/
-    ├── cells/                 # one parquet per cell (cache)
+    ├── cells/                 # one parquet per cell (cache); glob *.parquet == 1 file/cell
+    ├── yprob/                 # per-item probabilities: one {cell_id}.parquet per cell
     ├── results.parquet        # concatenated
     └── figures/
 ```
+
+**Directory separation is a contract, not a convenience.** Cell results
+(`results/cells/`) and per-item probability files (`results/yprob/`) MUST live in
+separate directories so that `glob("results/cells/*.parquet")` returns exactly one
+file per cell and never a y_prob file. They previously shared the `cells/`
+namespace, which silently mixed them for any glob-based reader (wrong answers, no
+error). See DEVIATIONS.md 2026-07-14 "Results-directory hygiene". Tests never write
+into this tree: `run_cell`/`run_all` take a `results_dir` argument that defaults to
+`results/`; tests pass a pytest `tmp_path`.
 
 ---
 
@@ -185,7 +195,7 @@ One row per (dataset × model × condition × seed × fold). Columns, exactly:
 | `cal_intercept` | float | see METRICS.md §2 |
 | `nb_at_eventrate` | float | Net Benefit at threshold = event_rate |
 | `nb_at_005` / `nb_at_010` / `nb_at_020` | float | |
-| `y_prob_path` | str | relative path to saved per-item probabilities (parquet) |
+| `y_prob_path` | str | relative path to saved per-item probabilities: `results/yprob/{cell_id}.parquet` (a directory SEPARATE from `results/cells/`) |
 
 **`y_prob_path` is mandatory.** Saving raw per-item predictions means every metric can be
 recomputed later without refitting 3,000 models. This is the single highest-value line in
@@ -238,6 +248,15 @@ replaced by venv+pip on the target machine):
 Append-only. Records changes to this SPEC. Deviations from `PREREG.md` still go in
 `DEVIATIONS.md`; this log is for the implementation contract itself.
 
+- **2026-07-14** — Results-directory hygiene. (a) §1 layout: added `results/yprob/`
+  and documented that `results/cells/` and `results/yprob/` are separate
+  directories by contract, so `glob("results/cells/*.parquet")` matches exactly one
+  file per cell. (b) §4: `y_prob_path` now points to `results/yprob/{cell_id}.parquet`
+  (was `results/cells/{cell_id}.yprob.parquet`, which shared the cells glob
+  namespace). (c) `run_cell`/`run_all` gained a trailing `results_dir` argument
+  (default `results/`) so tests write to a pytest `tmp_path` and can never
+  contaminate the real results tree. No estimand, metric, or hyperparameter changed;
+  see DEVIATIONS.md 2026-07-14 "Results-directory hygiene".
 - **2026-07-14** — Added `requirements.lock.txt` (output of `pip freeze`) alongside
   `requirements.txt`, and documented both in §6.1. `requirements.txt` is the
   human-readable intent; `requirements.lock.txt` is the exact reproducible environment.
