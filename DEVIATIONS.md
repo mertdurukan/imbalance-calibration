@@ -16,4 +16,8 @@ Format:
 
 ---
 
-(no deviations yet)
+## 2026-07-14T05:37:00Z — conda → venv+pip environment
+- **Changed:** Replaced `environment.yml` / conda `make setup` with `requirements.txt` + `python3.11 -m venv .venv` + pip. All make targets now invoke `./.venv/bin/python` explicitly. Added `make verify` for import/libomp smoke check. SPEC §6 referenced conda.
+- **Reason:** Target machine (macOS Apple Silicon) has no conda installed.
+- **Decided:** BEFORE seeing affected results
+- **Impact on hypotheses:** none
