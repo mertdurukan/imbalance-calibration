@@ -172,29 +172,66 @@ def test_ece_constant_high_balanced() -> None:
 
 
 def test_ece_equal_mass_not_equal_width() -> None:
-    """Skewed p: equal-mass ECE must match the quantile reference, not equal-width."""
+    """Equal-mass ECE must expose a calibration error that equal-width bins hide.
+
+    LOAD-BEARING CONSTRUCTION — do NOT tune these numbers. The whole point of the
+    test is defeated if the data is changed to make it pass. It works because:
+      * 90% of the mass (27_000 / 30_000 points) is packed inside the FIRST
+        equal-width bin, [0, W) where W = 1 / ECE_N_BINS. Equal-width binning
+        therefore lumps all of it into a single wide bin.
+      * Inside that region the miscalibration REVERSES sign at W/2: points below
+        W/2 have true rate W while points above have true rate 0. Averaged over
+        the whole [0, W) region these errors cancel, so the single equal-width bin
+        sees conf ≈ acc and reports almost nothing (width_ref ≈ 0.0012).
+      * Equal-mass binning slices that same dense region into many bins, so the
+        sign-reversing error is no longer averaged away and is fully exposed
+        (mass_ref ≈ 0.0440).
+    """
     rng = np.random.default_rng(5)
     n = 30_000
-    p = rng.beta(0.3, 4.0, size=n)  # heavily skewed toward 0
-    # Miscalibrate: labels flip relative to a threshold so |acc - conf| is non-trivial
-    y = (p < 0.15).astype(float)
+    W = 1.0 / ECE_N_BINS          # width of the FIRST equal-width bin
+    # 90% of the mass concentrated inside that first equal-width bin
+    n_low = 27_000
+    p_low = rng.uniform(0.0, W, size=n_low)
+    # Sign-REVERSING miscalibration inside that region: it cancels out when the whole
+    # region is one wide bin, but is fully exposed once split into equal-mass bins.
+    true_low = np.where(p_low < W / 2, W, 0.0)
+    # Remaining 10%: well-calibrated, spread over the upper range
+    n_high = n - n_low
+    p_high = rng.uniform(0.5, 1.0, size=n_high)
+    true_high = p_high
+
+    p = np.concatenate([p_low, p_high])
+    true_p = np.concatenate([true_low, true_high])
+    y = rng.binomial(1, np.clip(true_p, 0.0, 1.0)).astype(float)
 
     value = ece(y, p)
 
     mass_ref = _ece_equal_mass(y, p, ECE_N_BINS)
     width_ref = _ece_equal_width(y, p, ECE_N_BINS)
 
-    # Equal-mass partition: bin counts differ by at most 1
+    # 1. Equal-mass partition: bin counts differ by at most 1
     order = np.argsort(p)
     bin_sizes = [len(b) for b in np.array_split(order, ECE_N_BINS)]
-    assert max(bin_sizes) - min(bin_sizes) <= 1
+    assert max(bin_sizes) - min(bin_sizes) <= 1, (
+        f"equal-mass bins not balanced: sizes={bin_sizes}"
+    )
 
-    # Equal-mass and equal-width must meaningfully disagree on this skewed set
-    assert abs(mass_ref - width_ref) > 0.02
+    # 2. Equal-width is BLIND to the error — this is the point
+    assert width_ref < 0.01, f"mass_ref={mass_ref}, width_ref={width_ref}"
 
-    # Implementation must match equal-mass, not equal-width
-    assert abs(value - mass_ref) < 1e-9
-    assert abs(value - width_ref) > 0.02
+    # 3. Equal-mass REVEALS it
+    assert mass_ref > 0.03, f"mass_ref={mass_ref}, width_ref={width_ref}"
+
+    # 4. Implementation IS equal-mass
+    assert abs(value - mass_ref) < 1e-9, (
+        f"value={value}, mass_ref={mass_ref}, width_ref={width_ref}"
+    )
+
+    # 5. Implementation is NOT equal-width
+    assert abs(value - width_ref) > 0.02, (
+        f"value={value}, mass_ref={mass_ref}, width_ref={width_ref}"
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -271,4 +308,27 @@ def test_bootstrap_ci_shape_and_point() -> None:
     assert lo < point < hi
     # Point estimate must equal the metric on the full sample (not bootstrap mean)
     full = brier(y, p)
+    assert abs(point - full) < 1e-9
+
+
+def test_bootstrap_ci_forwards_metric_kwargs() -> None:
+    """bootstrap_ci must forward metric kwargs (e.g. pt) to net_benefit.
+
+    net_benefit requires `pt`, so without kwargs passthrough this call would
+    raise TypeError. Net Benefit is the headline metric and needs CIs at
+    analysis time.
+    """
+    rng = np.random.default_rng(9)
+    n = 2_000
+    p = rng.uniform(0.0, 1.0, size=n)
+    y = rng.binomial(1, np.clip(p, 0.0, 1.0)).astype(float)
+
+    point, lo, hi = bootstrap_ci(y, p, net_benefit, n=BOOTSTRAP_N, seed=0, pt=0.2)
+
+    assert np.isfinite(point)
+    assert np.isfinite(lo)
+    assert np.isfinite(hi)
+    assert lo < point < hi
+    # Point estimate must equal the metric on the full sample exactly
+    full = net_benefit(y, p, pt=0.2)
     assert abs(point - full) < 1e-9

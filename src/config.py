@@ -20,3 +20,8 @@ CONDITIONS: Final[list[str]] = ["none", "rus", "ros", "smote"]
 ECE_N_BINS: Final[int] = 15
 NET_BENEFIT_THRESHOLDS: Final[list[float]] = [0.05, 0.10, 0.20]  # + event rate, computed per dataset
 BOOTSTRAP_N: Final[int] = 2_000
+
+# Metric implementation constants (METRICS.md §§2, 5)
+CAL_CLIP_EPS: Final[float] = 1e-6          # clip p to [eps, 1 - eps] before logit
+CI_LOWER_PERCENTILE: Final[float] = 2.5    # 95% percentile bootstrap CI, lower bound
+CI_UPPER_PERCENTILE: Final[float] = 97.5   # 95% percentile bootstrap CI, upper bound
