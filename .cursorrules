@@ -1,0 +1,50 @@
+# PROJECT RULES — imbalance-calibration study
+
+You are implementing a PRE-REGISTERED scientific experiment. The experiment design is
+frozen in `PREREG.md`. Your job is to implement it exactly, not to improve it.
+
+## HARD PROHIBITIONS (never do these, even if asked mid-session, even if it seems better)
+
+1. **NEVER tune hyperparameters.** Model hyperparameters are fixed in `src/config.py`.
+   Do not add grid search, random search, Optuna, `GridSearchCV`, `RandomizedSearchCV`,
+   or early-stopping-on-validation-metric beyond what is already specified.
+   Rationale: the estimand is the DIFFERENCE BETWEEN CONDITIONS, not peak performance.
+   Tuning per condition destroys the comparison.
+
+2. **NEVER apply resampling (SMOTE/ROS/RUS) outside a training fold.**
+   Resampling MUST happen inside an `imblearn.pipeline.Pipeline`, never on the full
+   dataset, never before `cross_validate`. This is data leakage and invalidates the study.
+   If you see resampling applied to X before splitting: that is a bug. Fix it.
+
+3. **NEVER drop, skip, or silently exclude a dataset, fold, or condition.**
+   If a cell fails, record the failure in the results table with `status="failed"` and
+   the exception string. Never `try/except: continue`. Never filter out "bad" datasets.
+   Rationale: silent exclusion is cherry-picking.
+
+4. **NEVER change a metric definition.** All metrics are specified in `METRICS.md` with
+   exact formulas. Implement them literally. Do not substitute `sklearn.calibration`
+   defaults for the specified equal-mass binning. Do not "simplify".
+
+5. **NEVER edit `PREREG.md`.** It is frozen. If reality requires a change, append an
+   entry to `DEVIATIONS.md` with an ISO timestamp and a reason, and tell the user.
+
+6. **NEVER report a point estimate without a 95% CI.** Every number in every output
+   table carries an uncertainty interval.
+
+7. **NEVER add a new dependency** without adding it to `environment.yml` with a pinned
+   version, in the same commit.
+
+## REQUIRED PRACTICES
+
+- Every run is **resumable**: results are cached per cell (see `SPEC.md` §5). Re-running
+  `make reproduce` must not recompute completed cells.
+- Every random operation takes an explicit seed from `config.SEEDS`. No implicit RNG.
+- `pytest` must pass before any experiment run. The tests in `tests/` are contract tests;
+  they encode the prohibitions above. Do not weaken a test to make it pass.
+- Long output goes to `results/`, never printed to stdout.
+- Python 3.11. Type hints on every public function.
+
+## WHEN UNSURE
+
+Stop and ask. Do not guess a design decision. A wrong guess here contaminates a
+scientific result, which is worse than a delay.
