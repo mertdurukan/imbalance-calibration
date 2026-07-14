@@ -81,6 +81,12 @@ def select_datasets() -> list[int]:
     """Apply PREREG §4.1 criteria against the OpenML API.
     Returns the first N_DATASETS OpenML dataset IDs sorted ASCENDING by ID.
     MUST be deterministic. MUST be run once; result written to datasets.txt.
+
+    "missing-value rate <= MAX_MISSING_RATE" is defined CELL-LEVEL:
+        missing_rate = NumberOfMissingValues / (NumberOfInstances * NumberOfFeatures)
+    (a proportion of data cells, NOT a proportion of affected rows). This
+    definitional lock resolves a gap in PREREG §4.1 — see DEVIATIONS.md 2026-07-14
+    "Ambiguity resolution: definition of missing-value rate".
     """
 
 def load_dataset(dataset_id: int) -> tuple[pd.DataFrame, pd.Series]:
@@ -244,3 +250,8 @@ Append-only. Records changes to this SPEC. Deviations from `PREREG.md` still go 
 - **2026-07-14** — corrected test_ece_equal_mass_not_equal_width (original construction made
   both binnings agree at ECE ~0.85 and could not distinguish them); fixed bootstrap_ci to
   forward metric kwargs. No experimental results existed at the time of either change.
+- **2026-07-14** — locked the definition of "missing-value rate" in the `select_datasets`
+  contract (§3) as CELL-LEVEL: `NumberOfMissingValues / (NumberOfInstances *
+  NumberOfFeatures)`. PREREG §4.1 left the denominator unspecified; this records the
+  resolution so it cannot drift. See DEVIATIONS.md 2026-07-14 "Ambiguity resolution:
+  definition of missing-value rate". No experimental results existed at the time.
