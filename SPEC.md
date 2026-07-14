@@ -235,3 +235,12 @@ Append-only. Records changes to this SPEC. Deviations from `PREREG.md` still go 
 - **2026-07-14** — Added `requirements.lock.txt` (output of `pip freeze`) alongside
   `requirements.txt`, and documented both in §6.1. `requirements.txt` is the
   human-readable intent; `requirements.lock.txt` is the exact reproducible environment.
+- **2026-07-14** — Pinned `scipy==1.13.1` in `requirements.txt` (and regenerated
+  `requirements.lock.txt`). The lock file had resolved `scipy==1.17.1`, but SciPy removed
+  `scipy._lib._util._lazywhere` in 1.14, which `statsmodels==0.14.2` imports, so
+  `import statsmodels.api` failed. 1.13.1 is the last pre-1.14 release and is compatible
+  with `statsmodels==0.14.2` and `numpy==1.26.4`. This is an environment/build fix, not a
+  design deviation — no estimand, metric, or hyperparameter changed.
+- **2026-07-14** — corrected test_ece_equal_mass_not_equal_width (original construction made
+  both binnings agree at ECE ~0.85 and could not distinguish them); fixed bootstrap_ci to
+  forward metric kwargs. No experimental results existed at the time of either change.
