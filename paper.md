@@ -1,4 +1,4 @@
-# Imbalance Corrections Don't Help Modern Tabular ML — and the One Case Where They Seem To Is a Broken Baseline
+# Imbalance Corrections Don't Help Modern Tabular ML, and the One Case Where They Seem To Is a Broken Baseline
 
 *Working draft. All numeric values are final, taken verbatim from the frozen pre-registered analysis (2,400 fits, commit history intact). Prose is drafted for revision, not final submission.*
 
@@ -6,13 +6,13 @@
 
 ## Abstract
 
-Class-imbalance corrections — SMOTE, random over-sampling, random under-sampling — are near-universal in applied tabular machine learning. The evidence that they help is surprisingly thin, and concentrated on logistic regression. Van den Goorbergh et al. (2022) showed that for logistic regression, imbalance corrections do not improve discrimination and substantially damage calibration; Carriero et al. (2025) extended the analysis to machine-learning models but stated explicitly that the effect on the calibration of flexible ML methods remained unknown.
+Class-imbalance corrections (SMOTE, random over-sampling, random under-sampling) are near-universal in applied tabular machine learning. The evidence that they help is surprisingly thin, and concentrated on logistic regression. Van den Goorbergh et al. (2022) showed that for logistic regression, imbalance corrections do not improve discrimination and substantially damage calibration; Carriero et al. (2025) extended the analysis to machine-learning models but stated explicitly that the effect on the calibration of flexible ML methods remained unknown.
 
-We pre-registered and executed a factorial study — 8 OpenML datasets × 3 model families (logistic regression, gradient-boosted trees, multilayer perceptron) × 4 conditions × 25 replicates = 2,400 model fits — measuring discrimination, calibration, and decision quality. We find that corrections do not improve discrimination for logistic regression or gradient-boosted trees (|ΔAUROC| < 0.01 across all six contrasts), that they severely damage calibration in every model family (calibration-in-the-large moves from approximately 0 to approximately −2; expected calibration error rises up to fivefold), and that in all 36 decision-analytic contrasts, no correction outperforms simply shifting the decision threshold on the uncorrected model. Our calibration hypothesis (H2) has three sub-predictions per cell — that corrections push the calibration slope away from 1.0, the intercept away from 0.0, and expected calibration error up — and it holds in 26 of the 27 verdict cells across the nine model×correction cells, the single failure being the XGBoost/SMOTE intercept.
+We pre-registered and executed a factorial study, 8 OpenML datasets × 3 model families (logistic regression, gradient-boosted trees, multilayer perceptron) × 4 conditions × 25 replicates = 2,400 model fits, measuring discrimination, calibration, and decision quality. We find that corrections do not improve discrimination for logistic regression or gradient-boosted trees (|ΔAUROC| < 0.01 across all six contrasts), that they severely damage calibration in every model family (calibration-in-the-large moves from approximately 0 to approximately −2; expected calibration error rises up to fivefold), and that in all 36 decision-analytic contrasts, no correction outperforms simply shifting the decision threshold on the uncorrected model. Our calibration hypothesis (H2) has three sub-predictions per cell (that corrections push the calibration slope away from 1.0, the intercept away from 0.0, and expected calibration error up), and it holds in 26 of the 27 verdict cells across the nine model×correction cells, the single failure being the XGBoost/SMOTE intercept.
 
-The one apparent exception — the MLP, where corrections raise AUROC by up to 0.05 on average — is not a benefit of resampling. We show mechanistically that accuracy-monitored early stopping halts training after roughly twelve iterations on low-prevalence data, because a majority-class predictor already achieves validation accuracy equal to one minus the event rate. Resampling accidentally restores a usable training signal. The apparent gain is repair of a broken baseline, not improvement.
+The one apparent exception (the MLP, where corrections raise AUROC by up to 0.05 on average) is not a benefit of resampling. We show mechanistically that accuracy-monitored early stopping halts training after roughly twelve iterations on low-prevalence data, because a majority-class predictor already achieves validation accuracy equal to one minus the event rate. Resampling accidentally restores a usable training signal. The apparent gain is repair of a broken baseline, not improvement.
 
-We further find that under standard decision thresholds, corrections can make models actively harmful: random under-sampling produced a negative net benefit — worse than treating no one — in 118 of 200 MLP replicates at a threshold of 0.20, converting a useful uncorrected model into a harmful one in 89 of them.
+We further find that under standard decision thresholds, corrections can make models actively harmful: random under-sampling produced a negative net benefit (worse than treating no one) in 118 of 200 MLP replicates at a threshold of 0.20, converting a useful uncorrected model into a harmful one in 89 of them.
 
 The recommendation is simple: do not resample. If the decision operating point is wrong, move the threshold. It is free, reversible, and leaves the model's probabilities intact.
 
@@ -20,7 +20,7 @@ The recommendation is simple: do not resample. If the decision operating point i
 
 ## 1. Introduction
 
-Applied tabular machine learning treats class-imbalance correction as hygiene. Faced with a dataset where the positive class is rare, the reflex is to rebalance — most often with SMOTE — before training. The practice is codified in tutorials, default pipelines, and reviewer expectations.
+Applied tabular machine learning treats class-imbalance correction as hygiene. Faced with a dataset where the positive class is rare, the reflex is to rebalance, most often with SMOTE, before training. The practice is codified in tutorials, default pipelines, and reviewer expectations.
 
 The empirical basis for this reflex is weaker than its ubiquity suggests. The most careful evidence concerns logistic regression, where van den Goorbergh et al. (2022) demonstrated that imbalance corrections do not improve the area under the ROC curve, damage probability calibration, and that any apparent classification benefit is reproducible for free by adjusting the decision threshold. Carriero et al. (2025) carried the question into machine learning, but were explicit that the effect of imbalance corrections on the calibration of flexible ML models was not yet known.
 
@@ -30,18 +30,18 @@ We answer all three under pre-registration, and we report an outcome that falsif
 
 ## 2. Related work
 
-The concern that class-imbalance corrections may harm rather than help prediction models originates in a line of work from the Utrecht group. **Van den Goorbergh et al. (2022)** examined logistic regression under four conditions — no correction, random undersampling, random oversampling, and SMOTE — across simulation and a clinical case study. They found that corrections improved the sensitivity–specificity balance, but that the same balance was obtainable by shifting the decision threshold on the uncorrected model; corrections otherwise produced strong miscalibration, systematically overestimating risk, without improving discrimination. Their conclusion was that outcome imbalance is not a problem in itself, and that correcting it can worsen performance.
+The concern that class-imbalance corrections may harm rather than help prediction models originates in a line of work from the Utrecht group. **Van den Goorbergh et al. (2022)** examined logistic regression under four conditions (no correction, random undersampling, random oversampling, and SMOTE) across simulation and a clinical case study. They found that corrections improved the sensitivity–specificity balance, but that the same balance was obtainable by shifting the decision threshold on the uncorrected model; corrections otherwise produced strong miscalibration, systematically overestimating risk, without improving discrimination. Their conclusion was that outcome imbalance is not a problem in itself, and that correcting it can worsen performance.
 
 **Piccininni et al. (2024)** analysed random resampling techniques and reached a compatible conclusion regarding their consequences for calibration and discrimination in clinical risk prediction, reinforcing that the calibration damage is a general property of resampling rather than an artifact of one implementation.
 
-**Carriero et al. (2025)** extended the question from logistic regression to flexible machine-learning methods — support vector machines, random forests, XGBoost, and boosting ensembles — using Monte Carlo simulation and a MIMIC-III case study. Their calibration finding replicated van den Goorbergh's across every method: corrections consistently produced risk overestimation, and the miscalibration was often not repaired by recalibration. Their discrimination finding, however, was explicitly model-dependent — corrections improved discrimination for some algorithms (SVM, random forest) and worsened it for others (XGBoost, boosting ensembles) — and they noted a specific unexplained anomaly, that random forest with random oversampling was often well-calibrated in simulation but not in their case study. Crucially, they framed the calibration behaviour of flexible ML methods under imbalance correction as, at the time, largely unknown, and called for further work.
+**Carriero et al. (2025)** extended the question from logistic regression to flexible machine-learning methods (support vector machines, random forests, XGBoost, and boosting ensembles) using Monte Carlo simulation and a MIMIC-III case study. Their calibration finding replicated van den Goorbergh's across every method: corrections consistently produced risk overestimation, and the miscalibration was often not repaired by recalibration. Their discrimination finding, however, was explicitly model-dependent: corrections improved discrimination for some algorithms (SVM, random forest) and worsened it for others (XGBoost, boosting ensembles); and they noted a specific unexplained anomaly, that random forest with random oversampling was often well-calibrated in simulation but not in their case study. Crucially, they framed the calibration behaviour of flexible ML methods under imbalance correction as, at the time, largely unknown, and called for further work.
 
-Two gaps remain. First, this literature is almost entirely clinical and simulation-based; whether the same effects hold on heterogeneous real-world tabular benchmarks, and whether they matter for the *decision* a model drives (as opposed to its discrimination or calibration in isolation), has not been tested factorially. Second, and more importantly, the model-dependence of the discrimination result — corrections appearing to help some algorithms — has been reported but not *explained*. The present study addresses both: we test discrimination, calibration, and decision quality (net benefit) together on eight real tabular datasets, and we trace the one case where corrections appear to improve discrimination to its mechanism, showing it to be an artifact of the baseline rather than a benefit of the correction.
+Two gaps remain. First, this literature is almost entirely clinical and simulation-based; whether the same effects hold on heterogeneous real-world tabular benchmarks, and whether they matter for the *decision* a model drives (as opposed to its discrimination or calibration in isolation), has not been tested factorially. Second, and more importantly, the model-dependence of the discrimination result (corrections appearing to help some algorithms) has been reported but not *explained*. The present study addresses both: we test discrimination, calibration, and decision quality (net benefit) together on eight real tabular datasets, and we trace the one case where corrections appear to improve discrimination to its mechanism, showing it to be an artifact of the baseline rather than a benefit of the correction.
 
 ## 3. Methods
 
 ### 3.1 Pre-registration
-The full design — datasets, models, conditions, metrics, hypotheses, and falsification criteria — was frozen before any data was queried. The pre-registration is the first commit in the repository, timestamped before every result. Two deviations arose and are logged: the pre-registered pool yielded eight datasets rather than the intended ten (the pool was not broadened, to preserve the mechanical selection), and the phrase "missing-value rate" was resolved to a cell-level definition. Both were decided before any model was fit.
+The full design (datasets, models, conditions, metrics, hypotheses, and falsification criteria) was frozen before any data was queried. The pre-registration is the first commit in the repository, timestamped before every result. Two deviations arose and are logged: the pre-registered pool yielded eight datasets rather than the intended ten (the pool was not broadened, to preserve the mechanical selection), and the phrase "missing-value rate" was resolved to a cell-level definition. Both were decided before any model was fit.
 
 ### 3.2 Datasets
 Eight datasets were selected mechanically from OpenML: binary targets, minority-class prevalence between 1% and 20%, between 2,000 and 200,000 rows, no more than 30% missing cells, sorted by dataset ID ascending, with all qualifying datasets taken. There was no hand-curation; the dataset list was committed before any model was fit. The datasets span software-defect prediction (jm1, kc1), medical screening (sick), bank marketing, environmental sensing (ozone), customer churn, ad classification, and remote-sensing land cover (wilt), with event rates from 0.054 to 0.193.
@@ -50,7 +50,7 @@ Eight datasets were selected mechanically from OpenML: binary targets, minority-
 Logistic regression, gradient-boosted trees (XGBoost), and a multilayer perceptron, each with fixed hyperparameters transcribed from the pre-registration. Hyperparameters are held constant across all conditions: the quantity being estimated is the *difference between conditions*, not peak performance, and per-condition tuning would confound that difference. No hyperparameter search occurs anywhere in the codebase; a contract test enforces this.
 
 ### 3.4 Conditions
-Four training conditions — no correction, random under-sampling, random over-sampling, and SMOTE — each balancing the training data to a 1:1 ratio. A fifth analysis-only condition, *no correction with a shifted decision threshold*, is computed at analysis time from the saved per-item probabilities of the uncorrected model.
+Four training conditions (no correction, random under-sampling, random over-sampling, and SMOTE) each balancing the training data to a 1:1 ratio. A fifth analysis-only condition, *no correction with a shifted decision threshold*, is computed at analysis time from the saved per-item probabilities of the uncorrected model.
 
 ### 3.5 Leakage guard, proven rather than asserted
 Resampling is confined to training folds by placing it inside the cross-validation pipeline. We do not merely claim this. A mutation test establishes that our leakage test can detect a violation: a deliberately leaky implementation, which resamples the full dataset before splitting, was rejected because a held-out sentinel identifier reached the model's training data. The guard is verified, not assumed.
@@ -64,7 +64,7 @@ Discrimination is measured by AUROC and average precision. Calibration is measur
 
 For the two model families without early stopping, imbalance corrections leave discrimination essentially unchanged. Every paired ΔAUROC versus the uncorrected model falls in the third decimal place: logistic regression ranges from −0.0022 to +0.0008, and gradient-boosted trees from −0.0097 to −0.0003. Both satisfy the pre-registered criterion of |ΔAUROC| < 0.01.
 
-The MLP is the sole exception, with mean ΔAUROC up to +0.055 — failing the criterion. Section 4.4 shows this failure is not a benefit of correction.
+The MLP is the sole exception, with mean ΔAUROC up to +0.055, failing the criterion. Section 4.4 shows this failure is not a benefit of correction.
 
 | model | contrast | n | ΔAUROC (mean [95%]) | ΔAUPRC (mean [95%]) | H1 (|ΔAUROC|<0.01) |
 | --- | --- | --- | --- | --- | --- |
@@ -84,9 +84,9 @@ The MLP is the sole exception, with mean ΔAUROC up to +0.055 — failing the cr
 
 ### 4.2 Calibration: destroyed (H2)
 
-Corrections damage calibration in every model family. The clearest signal is calibration-in-the-large, which is zero for a perfectly calibrated model. The uncorrected logistic-regression baseline is nearly perfect at +0.013, as maximum-likelihood theory predicts. After correction it moves to approximately −2.2 across all three resamplers — a large, systematic overestimation of risk. Expected calibration error rises from 0.034 to as high as 0.19, roughly fivefold. The same qualitative pattern holds for the tree ensemble and the MLP.
+Corrections damage calibration in every model family. The clearest signal is calibration-in-the-large, which is zero for a perfectly calibrated model. The uncorrected logistic-regression baseline is nearly perfect at +0.013, as maximum-likelihood theory predicts. After correction it moves to approximately −2.2 across all three resamplers: a large, systematic overestimation of risk. Expected calibration error rises from 0.034 to as high as 0.19, roughly fivefold. The same qualitative pattern holds for the tree ensemble and the MLP.
 
-H2 makes three sub-predictions in each model×correction cell — that corrections push the calibration slope away from 1.0, the intercept (calibration-in-the-large) away from 0.0, and expected calibration error up — which across the nine model×correction cells yields twenty-seven verdicts in total. Twenty-six of the twenty-seven confirm the hypothesis. The single exception (the XGBoost/SMOTE intercept) is reported rather than concealed: its magnitude fell while its sign flipped. Figure 2 shows the corrected curves bowing below the diagonal — the visual signature of over-confident, over-high predicted risk.
+H2 makes three sub-predictions in each model×correction cell: that corrections push the calibration slope away from 1.0, the intercept (calibration-in-the-large) away from 0.0, and expected calibration error up, which across the nine model×correction cells yields twenty-seven verdicts in total. Twenty-six of the twenty-seven confirm the hypothesis. The single exception (the XGBoost/SMOTE intercept) is reported rather than concealed: its magnitude fell while its sign flipped. Figure 2 shows the corrected curves bowing below the diagonal: the visual signature of over-confident, over-high predicted risk.
 
 | model | condition | n | cal_slope (mean [95%]) | cal_intercept (mean [95%]) | ECE (mean [95%]) | Brier (mean [95%]) | H2 slope→away 1.0 | H2 intercept→away 0.0 | H2 ECE↑ |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -103,15 +103,15 @@ H2 makes three sub-predictions in each model×correction cell — that correctio
 | mlp | ros | 200 | 0.567 [0.224, 1.235] | -1.368 [-2.937, 0.041] | 0.0945 [0.0167, 0.2661] | 0.0856 [0.0152, 0.2144] | PASS | PASS | PASS |
 | mlp | smote | 200 | 0.542 [0.258, 1.327] | -1.341 [-2.569, -0.024] | 0.0928 [0.0145, 0.2499] | 0.0860 [0.0116, 0.2091] | PASS | PASS | PASS |
 
-> Absolute per-condition metrics. Mean + 95% interval (2.5/97.5 percentiles of the replicate distribution; descriptive, no t-test — folds not independent).
+> Absolute per-condition metrics. Mean + 95% interval (2.5/97.5 percentiles of the replicate distribution; descriptive, no t-test: folds not independent).
 > Perfect calibration: slope = 1.0, intercept = 0.0. H2 predicts corrections push slope AWAY from 1.0, intercept AWAY from 0.0, and RAISE ECE.
 > PASS/FAIL (corrections only) is vs the `none` reference (row 'ref') in each model: slope PASS iff |mean−1| > |none−1|; intercept PASS iff |mean| > |none|; ECE PASS iff mean > none. Brier has no pre-registered direction under H2 and carries no verdict.
 
-![Figure 2: calibration curves — H2](results/figures/figure2_calibration_curves.png)
+![Figure 2: calibration curves (H2)](results/figures/figure2_calibration_curves.png)
 
 ### 4.3 Decisions: threshold shifting is free and sufficient (H3)
 
-In all 36 decision-analytic contrasts — three models, three corrections, four thresholds — no correction beats the uncorrected model with a shifted decision threshold, with a 95% interval excluding zero. Everything a correction buys in decision terms, a free change of the decision threshold buys as well. Figure 1 shows the uncorrected curve lying on or above every corrected curve across the threshold range.
+In all 36 decision-analytic contrasts (three models, three corrections, four thresholds) no correction beats the uncorrected model with a shifted decision threshold, with a 95% interval excluding zero. Everything a correction buys in decision terms, a free change of the decision threshold buys as well. Figure 1 shows the uncorrected curve lying on or above every corrected curve across the threshold range.
 
 | model | threshold | contrast | n | ΔNB (mean [95%]) | H3 (nt ≥ corr) |
 | --- | --- | --- | --- | --- | --- |
@@ -156,15 +156,15 @@ In all 36 decision-analytic contrasts — three models, three corrections, four 
 > Positive ΔNB means `none + threshold shift` is at least as good as the correction. 95% interval = 2.5/97.5 percentiles (descriptive; no t-test).
 > H3 PASS iff the correction does NOT beat `none_threshold` with a 95% interval excluding zero (i.e. not hi < 0). H3 is falsified where a correction beats threshold-shifting on Net Benefit with a CI excluding zero (PREREG §3).
 
-![Figure 1: pooled decision curves — H3](results/figures/figure1_decision_curves.png)
+![Figure 1: pooled decision curves (H3)](results/figures/figure1_decision_curves.png)
 
 ### 4.4 The MLP "gain" is a broken baseline, with a measured mechanism
 
-The MLP is the only model configured with accuracy-monitored early stopping. Seventeen of two hundred uncorrected MLP replicates have AUROC below 0.6, with a minimum of 0.385 — worse than chance. All seventeen fall on the two lowest-prevalence datasets, wilt (0.054) and ozone (0.063); no corrected condition produces a single broken replicate.
+The MLP is the only model configured with accuracy-monitored early stopping. Seventeen of two hundred uncorrected MLP replicates have AUROC below 0.6, with a minimum of 0.385, worse than chance. All seventeen fall on the two lowest-prevalence datasets, wilt (0.054) and ozone (0.063); no corrected condition produces a single broken replicate.
 
 Exact reproduction of those seventeen cells, holding seed, fold, and hyperparameters fixed, reveals the cause. The broken replicates stop training after twelve to thirteen iterations, with a best internal-validation accuracy of 0.936 to 0.946 and a maximum predicted probability never exceeding 0.515. The matched SMOTE replicates train for eighteen to fifty-four iterations, reach validation accuracy near 0.99, and produce confident probabilities.
 
-The decisive number is the validation accuracy. The majority-class accuracy of the two affected datasets is 0.9369 (ozone) and 0.9461 (wilt), and the broken replicates' validation scores sit exactly on that band. The network is predicting the majority class, achieving the accuracy a constant predictor would achieve, and early stopping — which monitors accuracy — reads this as convergence and halts an untrained model. Resampling to 1:1 restores an informative accuracy signal, training proceeds, and the model learns.
+The decisive number is the validation accuracy. The majority-class accuracy of the two affected datasets is 0.9369 (ozone) and 0.9461 (wilt), and the broken replicates' validation scores sit exactly on that band. The network is predicting the majority class, achieving the accuracy a constant predictor would achieve, and early stopping, which monitors accuracy, reads this as convergence and halts an untrained model. Resampling to 1:1 restores an informative accuracy signal, training proceeds, and the model learns.
 
 Practitioners observe SMOTE deliver up to +0.48 AUROC on these replicates. What they observe is a race in which the baseline was disabled before the start. Figure 3 makes the mechanism visible at a glance: the broken group's iteration count is pinned at the floor while its validation accuracy lands precisely on the majority-class line.
 
@@ -172,7 +172,7 @@ Practitioners observe SMOTE deliver up to +0.48 AUROC on these replicates. What 
 
 ### 4.5 Corrections can make models actively harmful
 
-Beyond failing to help, corrections can harm. Using the sign of the pre-registered net benefit — a negative value means the model is worse than treating no one — random under-sampling on the MLP at a threshold of 0.20 produced negative net benefit in 118 of 200 replicates, and in 89 of them it converted a model that had been useful without correction into a harmful one. Logistic regression under the same correction and threshold flipped 82 of 200. The uncorrected model was almost never harmful for logistic regression or gradient-boosted trees (0 of 200 at every threshold). Gradient-boosted trees were the most robust; SMOTE was the least damaging correction for the ML models.
+Beyond failing to help, corrections can harm. Using the sign of the pre-registered net benefit (a negative value means the model is worse than treating no one), random under-sampling on the MLP at a threshold of 0.20 produced negative net benefit in 118 of 200 replicates, and in 89 of them it converted a model that had been useful without correction into a harmful one. Logistic regression under the same correction and threshold flipped 82 of 200. The uncorrected model was almost never harmful for logistic regression or gradient-boosted trees (0 of 200 at every threshold). Gradient-boosted trees were the most robust; SMOTE was the least damaging correction for the ML models.
 
 | model | condition | threshold | n | (a) n_NB<0 | (a) frac_NB<0 [95%] | (b) n_corr<0 & none>0 | (b) frac_corr<0 & none>0 [95%] |
 | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -227,7 +227,7 @@ Beyond failing to help, corrections can harm. Using the sign of the pre-register
 
 > NB is the pre-registered Net Benefit recomputed from the saved y_prob files at the pre-registered thresholds {event rate, 0.05, 0.10, 0.20} (the same values as Table 3, METRICS.md §4.1). NB < 0 means WORSE than treating nobody at that threshold.
 > (a) counts replicates with NB(condition) < 0. `none` is included as the reference row so each correction can be read against the uncorrected model at the same (model, threshold).
-> (b) is PAIRED within each (dataset, seed, fold): replicates where the correction's NB < 0 (harmful) WHILE `none`'s NB > 0 (useful) on the SAME replicate — the correction turned a useful model into a harmful one at that threshold. On the `none` reference row this quantity is impossible by construction and is marked '—'.
+> (b) is PAIRED within each (dataset, seed, fold): replicates where the correction's NB < 0 (harmful) WHILE `none`'s NB > 0 (useful) on the SAME replicate: the correction turned a useful model into a harmful one at that threshold. On the `none` reference row this quantity is impossible by construction and is marked '—'.
 > n = replicates per (model, condition) = 8 datasets × 5 seeds × 5 folds = 200 (n_pairs likewise for the paired part (b)).
 > 95% interval = percentile bootstrap over the 200 replicate indicators (2000 resamples, seed config.SEEDS[0]). Descriptive only: replicates share 8 datasets and CV folds are not independent (METRICS.md §5), so this is not a significance test.
 > This is a DESCRIPTIVE report of the sign of a pre-registered quantity; no PASS/FAIL verdict is assigned (unlike the pre-registered H1–H3 tables).
@@ -236,11 +236,11 @@ Beyond failing to help, corrections can harm. Using the sign of the pre-register
 
 ## 5. Discussion
 
-For a practitioner, the operational takeaway is a diagnostic reversal. If imbalance correction appears to help your model, the first hypothesis should be that your baseline is broken — as it was here for the MLP, silently, through a default early-stopping rule interacting with low prevalence. The apparent gain may be repair, not improvement, and the repair is better achieved by fixing the training procedure than by distorting the data.
+For a practitioner, the operational takeaway is a diagnostic reversal. If imbalance correction appears to help your model, the first hypothesis should be that your baseline is broken, as it was here for the MLP, silently, through a default early-stopping rule interacting with low prevalence. The apparent gain may be repair, not improvement, and the repair is better achieved by fixing the training procedure than by distorting the data.
 
 For the field, the mechanism explains the folklore. The persistent belief that resampling helps does not require resampling to help. It requires only that default training procedures fail quietly on imbalanced data in a way that resampling happens to mask. Discrimination is unchanged for models that were training correctly all along; the "gains" accrue precisely where the baseline was broken.
 
-The consistent cost is calibration. Every correction, in every model family, moved calibration-in-the-large sharply negative — a systematic overestimation of risk. If the model's probabilities inform a decision, and if they do not one should ask why the model exists, then corrections make the decision worse, and at standard thresholds can make it actively harmful.
+The consistent cost is calibration. Every correction, in every model family, moved calibration-in-the-large sharply negative: a systematic overestimation of risk. If the model's probabilities inform a decision, and if they do not one should ask why the model exists, then corrections make the decision worse, and at standard thresholds can make it actively harmful.
 
 The alternative is threshold adjustment. It achieves everything the corrections achieve in decision terms, costs nothing, is reversible, and leaves the probabilities untouched.
 
@@ -248,7 +248,7 @@ The alternative is threshold adjustment. It achieves everything the corrections 
 
 The study covers eight tabular datasets. The pre-registered pool could not supply ten; we took all eight that qualified and declined to broaden the pool, to preserve the mechanical, cherry-picking-proof selection. The findings are tabular and do not extend to unstructured data.
 
-Hyperparameters were fixed. We do not claim these results hold under per-condition tuning; holding them fixed is a deliberate design choice that isolates the effect of the correction from the effect of tuning. The anticipated objection — that better MLP settings would remove the broken baseline, and with it the apparent SMOTE gain — is exactly the point. The configuration used is a standard default. The finding is that under standard defaults, on imbalanced data, the apparent benefit of correction is an artifact of a silently mistrained baseline.
+Hyperparameters were fixed. We do not claim these results hold under per-condition tuning; holding them fixed is a deliberate design choice that isolates the effect of the correction from the effect of tuning. The anticipated objection (that better MLP settings would remove the broken baseline, and with it the apparent SMOTE gain) is exactly the point. The configuration used is a standard default. The finding is that under standard defaults, on imbalanced data, the apparent benefit of correction is an artifact of a silently mistrained baseline.
 
 Class-weighting approaches, which reweight the loss rather than resample the data, are out of scope and are the natural next study. One dataset contains an entirely missing column, which the imputer drops; this is disclosed rather than silently handled.
 
@@ -265,9 +265,9 @@ A single command reproduces the entire study from a clean checkout. The pre-regi
 
 ---
 
-## Appendix — deferred writing tasks
+## Appendix: deferred writing tasks
 
 - §2 Related work: write out in prose, ≤15-word quotes, mostly paraphrase.
 - Insert Table 1–4 and Figure 1–3 at marked points; Figure S1 (per-dataset decision curves) as supplement.
-- Retitle for venue. Candidate framing: a short methods/─position paper for a stats-in-ML or clinical-ML venue where the Van Calster / van Smeden / Carriero line of work lives.
-- Circulate to the authors whose open question this closes — they are the natural amplifiers.
+- Retitle for venue. Candidate framing: a short methods/position paper for a stats-in-ML or clinical-ML venue where the Van Calster / van Smeden / Carriero line of work lives.
+- Circulate to the authors whose open question this closes; they are the natural amplifiers.

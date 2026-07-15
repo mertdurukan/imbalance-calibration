@@ -5,8 +5,8 @@ and SMOTE help logistic regression, XGBoost, and an MLP on imbalanced tabular da
 **8 OpenML datasets** (event rate 5–19%), 3 models, 4 resampling conditions, and 5×5
 stratified CV (2,400 fits, all completed), the corrections buy **no discrimination**, they
 **degrade calibration**, and any decision-analytic benefit is **reproduced for free by
-shifting the decision threshold**. The one apparent exception — the MLP seeming to gain
-AUROC from resampling — is a diagnosed artifact of an early-stopping baseline that collapses
+shifting the decision threshold**. The one apparent exception (the MLP seeming to gain
+AUROC from resampling) is a diagnosed artifact of an early-stopping baseline that collapses
 to near-chance on the most imbalanced data, not a real benefit of the correction. The design
 was frozen in [`PREREG.md`](PREREG.md) before any model was fit; every departure is logged in
 [`DEVIATIONS.md`](DEVIATIONS.md).
@@ -18,9 +18,9 @@ All estimates carry a 95% interval; see the tables in [`results/tables/`](result
 
 | Hypothesis | Verdict | What the data show |
 | --- | --- | --- |
-| **H1** — no meaningful AUROC gain (\|ΔAUROC\| < 0.01) | **Holds for logreg & XGBoost; fails for MLP** | logreg and XGBoost: all corrections within ±0.01 AUROC of `none` (Table 1). MLP: ROS +0.055, SMOTE +0.049, RUS +0.018 — but see the mechanism below. |
-| **H2** — corrections damage calibration | **Holds (26 of 27 verdict cells)** | Corrections push calibration slope away from 1.0, intercept away from 0.0, and raise ECE in every model×condition cell except one (XGBoost+SMOTE intercept). RUS is the most damaging (Table 2). |
-| **H3** — `none` + threshold shift ≥ every correction on Net Benefit | **Holds (all 36 verdict cells)** | No correction beats simple threshold-shifting on Net Benefit with a 95% interval excluding zero, at any threshold in {event rate, 0.05, 0.10, 0.20} (Table 3). |
+| **H1**: no meaningful AUROC gain (\|ΔAUROC\| < 0.01) | **Holds for logreg & XGBoost; fails for MLP** | logreg and XGBoost: all corrections within ±0.01 AUROC of `none` (Table 1). MLP: ROS +0.055, SMOTE +0.049, RUS +0.018, but see the mechanism below. |
+| **H2**: corrections damage calibration | **Holds (26 of 27 verdict cells)** | Corrections push calibration slope away from 1.0, intercept away from 0.0, and raise ECE in every model×condition cell except one (XGBoost+SMOTE intercept). RUS is the most damaging (Table 2). |
+| **H3**: `none` + threshold shift ≥ every correction on Net Benefit | **Holds (all 36 verdict cells)** | No correction beats simple threshold-shifting on Net Benefit with a 95% interval excluding zero, at any threshold in {event rate, 0.05, 0.10, 0.20} (Table 3). |
 
 ### The MLP "gain" is a collapsing baseline, not a benefit
 
@@ -32,13 +32,13 @@ the two lowest-event-rate datasets (`wilt` 13/25, `ozone-level-8hr` 4/25). Resam
 rebalances the training fold, so accuracy no longer favors the majority predictor: training
 runs longer (~31 iterations), the predicted-probability spread widens (std 0.07 → 0.23), and
 AUROC rises. The MLP H1 "fail" therefore measures an **un-collapsed baseline**, not a genuine
-effect of resampling — on the high-event-rate control (`jm1`, 19%) no replicate collapses.
+effect of resampling; on the high-event-rate control (`jm1`, 19%) no replicate collapses.
 See `results/diagnostics/report6`–`report9` and `results/figures/figure3_mlp_mechanism.png`.
 
 ### RUS can make a model actively harmful
 
 Beyond degrading calibration, **random undersampling** decalibrates predictions enough to
-push **Net Benefit below zero** — worse than treating nobody — at operating thresholds
+push **Net Benefit below zero** (worse than treating nobody) at operating thresholds
 (descriptive, `results/tables/table4_negative_net_benefit.md`). At threshold 0.20, RUS yields
 negative Net Benefit in 41% of logreg replicates (82/200) and 59% of MLP replicates
 (118/200); for the MLP, 89/200 replicates flipped from useful (`none` NB > 0) to harmful
