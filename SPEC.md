@@ -16,7 +16,8 @@ exactly these signatures. Do not restructure.
 ├── TASKS.md                   # ordered implementation tasks
 ├── DEVIATIONS.md              # append-only log
 ├── .cursorrules
-├── environment.yml
+├── requirements.txt           # human-readable intent (direct deps, pinned)
+├── requirements.lock.txt      # exact reproducible env (pip freeze output)
 ├── Makefile
 ├── datasets.txt               # generated ONCE by task 1, then frozen & committed
 ├── src/
@@ -199,10 +200,38 @@ this spec — do not skip it.
 
 | target | does |
 |---|---|
-| `make setup` | create env from `environment.yml` |
+| `make setup` | create `.venv` with `python3.11 -m venv .venv`, upgrade pip, then `pip install -r requirements.txt` |
+| `make verify` | import-check the core deps (sklearn, imblearn, xgboost, statsmodels, pandas, openml) |
 | `make test` | `pytest tests/ -x -q` |
 | `make datasets` | run `select_datasets()`, write `datasets.txt` (refuses to overwrite if it exists) |
 | `make pilot` | run 1 dataset × 1 model × all conditions × 1 seed — end-to-end smoke test |
 | `make reproduce` | `make test && python -m src.runner && python -m src.analyze` |
 
 **`make reproduce` must be the only command a reader needs.**
+
+### 6.1 Dependencies: two files, two purposes
+
+The environment is pinned in two committed files (see DEVIATIONS.md 2026-07-14 — conda was
+replaced by venv+pip on the target machine):
+
+| file | purpose | how it is produced |
+|---|---|---|
+| `requirements.txt` | **human-readable intent** — the direct dependencies the study needs, each pinned to an exact version | maintained by hand |
+| `requirements.lock.txt` | **exact reproducible environment** — the full transitive closure, byte-for-byte what was installed | `pip freeze > requirements.lock.txt` |
+
+- `make setup` installs from `requirements.txt` (the intent).
+- To reproduce the *exact* environment used for a result, install from the lock file
+  instead: `./.venv/bin/pip install -r requirements.lock.txt`.
+- Any change to `requirements.txt` MUST be followed by regenerating `requirements.lock.txt`
+  in the same commit, so the two never drift.
+
+---
+
+## Changelog
+
+Append-only. Records changes to this SPEC. Deviations from `PREREG.md` still go in
+`DEVIATIONS.md`; this log is for the implementation contract itself.
+
+- **2026-07-14** — Added `requirements.lock.txt` (output of `pip freeze`) alongside
+  `requirements.txt`, and documented both in §6.1. `requirements.txt` is the
+  human-readable intent; `requirements.lock.txt` is the exact reproducible environment.
