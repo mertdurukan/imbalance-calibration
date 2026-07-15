@@ -515,45 +515,75 @@ def table3_decisions(nb: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
 
 
 # --------------------------------------------------------------------------------
-# FIGURE 1 — decision curves (all conditions + treat-all + treat-none)
+# FIGURE 1 / S1 — decision curves (all conditions + treat-all + treat-none)
 # --------------------------------------------------------------------------------
-def _mean_nb_curve(y_probs: list[tuple[np.ndarray, np.ndarray]]) -> np.ndarray:
-    """Mean Net-Benefit curve over the NB_SWEEP, averaged across replicate cells."""
-    per_cell = np.empty((len(y_probs), NB_SWEEP.size), dtype=float)
-    for i, (y, p) in enumerate(y_probs):
-        for j, pt in enumerate(NB_SWEEP):
-            per_cell[i, j] = metrics.net_benefit(y, p, pt=float(pt))
-    return np.nanmean(per_cell, axis=0)
+YProbCache = dict[tuple[int, str, str], list[tuple[np.ndarray, np.ndarray]]]
+
+# Shared colour scheme for the fit conditions across both decision-curve figures.
+CONDITION_COLORS: dict[str, str] = {
+    "none": "black",
+    "rus": "tab:blue",
+    "ros": "tab:green",
+    "smote": "tab:red",
+}
 
 
-def figure1_decision_curves(results: pd.DataFrame) -> Path:
-    """Decision curves for every (dataset, model): all fit conditions + treat-all +
-    treat-none reference lines (METRICS.md §4).
+def _load_yprob_cache(results: pd.DataFrame) -> YProbCache:
+    """Preload held-out (y_true, y_prob) per (dataset, model, condition) once.
 
-    All 8 datasets × 3 models are shown as small multiples so no dataset is
-    cherry-picked. The `none` curve IS the threshold-shifted `none_threshold` arm (a
-    decision curve sweeps the threshold), so it is not drawn twice. Mean curves are
-    plotted; the pre-registered NB points with 95% intervals are in Table 3.
+    Both decision-curve figures consume the same predictions, so the ~2400 saved
+    y_prob files are read a single time and shared.
     """
     ok = results[results["status"] == "ok"]
-    dataset_ids = sorted(ok["dataset_id"].unique())
-    names = {int(r.dataset_id): r.dataset_name for r in ok.itertuples()}
-
-    # Preload y_prob per (dataset, model, condition) once.
-    cache: dict[tuple[int, str, str], list[tuple[np.ndarray, np.ndarray]]] = {}
+    cache: YProbCache = {}
     for r in ok.itertuples():
         key = (int(r.dataset_id), r.model, r.condition)
         yp = pd.read_parquet(r.y_prob_path)
         cache.setdefault(key, []).append(
             (yp["y_true"].to_numpy(), yp["y_prob"].to_numpy())
         )
+    return cache
+
+
+def _nb_curve_matrix(
+    y_probs: list[tuple[np.ndarray, np.ndarray]],
+) -> np.ndarray:
+    """Per-cell Net-Benefit curves over NB_SWEEP: shape (n_cells, len(NB_SWEEP))."""
+    per_cell = np.empty((len(y_probs), NB_SWEEP.size), dtype=float)
+    for i, (y, p) in enumerate(y_probs):
+        for j, pt in enumerate(NB_SWEEP):
+            per_cell[i, j] = metrics.net_benefit(y, p, pt=float(pt))
+    return per_cell
+
+
+def _mean_nb_curve(y_probs: list[tuple[np.ndarray, np.ndarray]]) -> np.ndarray:
+    """Mean Net-Benefit curve over the NB_SWEEP, averaged across replicate cells."""
+    return np.nanmean(_nb_curve_matrix(y_probs), axis=0)
+
+
+def figure_s1_decision_curves_by_dataset(
+    results: pd.DataFrame, cache: YProbCache | None = None
+) -> Path:
+    """Supplementary Figure S1: decision curves for every (dataset, model).
+
+    All 8 datasets × 3 models are shown as small multiples so no dataset is
+    cherry-picked. This is the full, unpooled companion to the condensed Figure 1
+    that appears in the paper body. The `none` curve IS the threshold-shifted
+    `none_threshold` arm (a decision curve sweeps the threshold), so it is not drawn
+    twice. Mean curves are plotted; the pre-registered NB points with 95% intervals
+    are in Table 3.
+    """
+    ok = results[results["status"] == "ok"]
+    dataset_ids = sorted(ok["dataset_id"].unique())
+    names = {int(r.dataset_id): r.dataset_name for r in ok.itertuples()}
+    if cache is None:
+        cache = _load_yprob_cache(results)
 
     n_rows = len(dataset_ids)
     n_cols = len(MODELS)
     fig, axes = plt.subplots(
         n_rows, n_cols, figsize=(4.2 * n_cols, 3.2 * n_rows), squeeze=False
     )
-    colors = {"none": "black", "rus": "tab:blue", "ros": "tab:green", "smote": "tab:red"}
 
     for i, did in enumerate(dataset_ids):
         event_rate = float(ok[ok["dataset_id"] == did]["event_rate"].iloc[0])
@@ -568,7 +598,9 @@ def figure1_decision_curves(results: pd.DataFrame) -> Path:
                     continue
                 curve = _mean_nb_curve(cells)
                 label = "none (=none_threshold)" if cond == "none" else cond
-                ax.plot(NB_SWEEP, curve, color=colors[cond], lw=1.4, label=label)
+                ax.plot(
+                    NB_SWEEP, curve, color=CONDITION_COLORS[cond], lw=1.4, label=label
+                )
             ax.plot(NB_SWEEP, treat_all, color="gray", ls="--", lw=1.0, label="treat-all")
             ax.axhline(0.0, color="gray", ls=":", lw=1.0, label="treat-none")
             ax.axvline(event_rate, color="purple", ls="-.", lw=0.8, alpha=0.6)
@@ -584,12 +616,94 @@ def figure1_decision_curves(results: pd.DataFrame) -> Path:
                 ax.legend(fontsize=6, loc="upper right")
 
     fig.suptitle(
-        "Figure 1 — Decision curves (all conditions + treat-all/treat-none). "
+        "Figure S1 — Decision curves by dataset (all conditions + treat-all/treat-none). "
         "Purple dash-dot = event rate. Mean over 25 seed×fold replicates; "
         "95% intervals for the pre-registered thresholds are in Table 3.",
         fontsize=9,
     )
     fig.tight_layout(rect=(0, 0, 1, 0.99))
+    FIGURES_DIR.mkdir(parents=True, exist_ok=True)
+    path = FIGURES_DIR / "figure_S1_decision_curves_by_dataset.png"
+    fig.savefig(path, dpi=150)
+    plt.close(fig)
+    return path
+
+
+def figure1_decision_curves(
+    results: pd.DataFrame, cache: YProbCache | None = None
+) -> Path:
+    """Condensed Figure 1 for the paper body: one panel per model (logreg / xgboost /
+    mlp), pooling the decision curve across all 8 datasets.
+
+    For each (model, condition) the Net-Benefit curve is computed per replicate cell
+    over the threshold sweep and POOLED across all 8 datasets (each contributes 25
+    seed×fold cells → 200 cells). The line is the mean across those cells and the band
+    is the 2.5/97.5 percentiles of the cell distribution — the same descriptive
+    interval convention as the tables (METRICS.md §5); it is NOT a test.
+
+    treat-all and treat-none reference lines are kept (METRICS.md §4). Because event
+    rate differs across datasets, the treat-all line is the mean of the eight
+    per-dataset treat-all curves (equal weight per dataset). The unpooled,
+    per-dataset curves are in Figure S1 so no dataset is hidden by the pooling.
+    """
+    ok = results[results["status"] == "ok"]
+    dataset_ids = sorted(ok["dataset_id"].unique())
+    if cache is None:
+        cache = _load_yprob_cache(results)
+
+    # Mean treat-all across datasets (each dataset weighted equally).
+    odds = NB_SWEEP / (1.0 - NB_SWEEP)
+    treat_all_stack = []
+    for did in dataset_ids:
+        er = float(ok[ok["dataset_id"] == did]["event_rate"].iloc[0])
+        treat_all_stack.append(er - (1.0 - er) * odds)
+    treat_all_mean = np.mean(np.vstack(treat_all_stack), axis=0)
+
+    n_cols = len(MODELS)
+    fig, axes = plt.subplots(1, n_cols, figsize=(4.6 * n_cols, 4.2), squeeze=False)
+
+    y_floor = min(-0.02, float(np.nanmin(treat_all_mean)))
+    for j, model in enumerate(MODELS):
+        ax = axes[0][j]
+        for cond in CONDITIONS:
+            # Pool the per-cell curves across every dataset for this (model, cond).
+            cells: list[tuple[np.ndarray, np.ndarray]] = []
+            for did in dataset_ids:
+                cells.extend(cache.get((did, model, cond), []))
+            if not cells:
+                continue
+            mat = _nb_curve_matrix(cells)
+            mean_curve = np.nanmean(mat, axis=0)
+            lo = np.nanpercentile(mat, CI_LOWER_PERCENTILE, axis=0)
+            hi = np.nanpercentile(mat, CI_UPPER_PERCENTILE, axis=0)
+            label = "none (=none_threshold)" if cond == "none" else cond
+            ax.plot(
+                NB_SWEEP, mean_curve, color=CONDITION_COLORS[cond], lw=1.6, label=label
+            )
+            ax.fill_between(
+                NB_SWEEP, lo, hi, color=CONDITION_COLORS[cond], alpha=0.12, lw=0
+            )
+        ax.plot(
+            NB_SWEEP, treat_all_mean, color="gray", ls="--", lw=1.1, label="treat-all"
+        )
+        ax.axhline(0.0, color="gray", ls=":", lw=1.1, label="treat-none")
+        ax.set_ylim(bottom=y_floor)
+        ax.set_title(model, fontsize=11)
+        ax.set_xlabel("threshold probability", fontsize=9)
+        if j == 0:
+            ax.set_ylabel("Net Benefit (pooled across 8 datasets)", fontsize=9)
+        ax.tick_params(labelsize=8)
+        if j == n_cols - 1:
+            ax.legend(fontsize=8, loc="upper right")
+
+    fig.suptitle(
+        "Figure 1 — Decision curves pooled across all 8 datasets, per model.\n"
+        "Line = mean over 200 dataset×seed×fold replicate curves; band = 2.5/97.5 "
+        "percentiles (descriptive).\n"
+        "treat-all = mean over datasets; treat-none = 0. Per-dataset curves: Figure S1.",
+        fontsize=9,
+    )
+    fig.tight_layout(rect=(0, 0, 1, 0.90))
     FIGURES_DIR.mkdir(parents=True, exist_ok=True)
     path = FIGURES_DIR / "figure1_decision_curves.png"
     fig.savefig(path, dpi=150)
@@ -685,7 +799,7 @@ def figure2_calibration_curves(results: pd.DataFrame) -> tuple[Path, int]:
 
 # --------------------------------------------------------------------------------
 def main() -> None:
-    """Produce the pre-registered H1/H2/H3 tables and the two figures.
+    """Produce the pre-registered H1/H2/H3 tables and the figures.
 
     Reads results/results.parquet and the saved results/yprob/ files; writes
     results/tables/ (markdown + csv) and results/figures/. Prints only a short
@@ -702,13 +816,15 @@ def main() -> None:
     nb = _net_benefit_per_cell(results)
     table3_decisions(nb)
 
-    fig1 = figure1_decision_curves(results)
+    cache = _load_yprob_cache(results)
+    fig1 = figure1_decision_curves(results, cache)
+    fig_s1 = figure_s1_decision_curves_by_dataset(results, cache)
     fig2, rep_did = figure2_calibration_curves(results)
 
     n_ok = int((results["status"] == "ok").sum())
     print(
         f"analyze: {len(results)} cells ({n_ok} ok). "
-        f"Tables -> {TABLES_DIR}/ ; Figures -> {fig1.name}, {fig2.name} "
+        f"Tables -> {TABLES_DIR}/ ; Figures -> {fig1.name}, {fig_s1.name}, {fig2.name} "
         f"(representative dataset {rep_did})."
     )
 

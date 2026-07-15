@@ -32,8 +32,13 @@ from __future__ import annotations
 import warnings
 from pathlib import Path
 
+import matplotlib
+
+matplotlib.use("Agg")  # headless: the figure is written to disk, never shown.
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+from matplotlib.lines import Line2D
 from sklearn.model_selection import StratifiedKFold
 
 from src import config, metrics
@@ -42,6 +47,7 @@ from src.datasets import load_dataset
 
 RESULTS_PATH: Path = Path("results") / "results.parquet"
 DIAG_DIR: Path = Path("results") / "diagnostics"
+FIGURES_DIR: Path = Path("results") / "figures"
 
 REPLICATE_KEYS: tuple[str, ...] = ("dataset_id", "seed", "fold")
 
@@ -53,6 +59,17 @@ CONTROL_DATASET_ID: int = 1053
 
 # Reproduction is "exact" if the recomputed AUROC matches the frozen value to here.
 AUROC_MATCH_TOL: float = 1e-9
+
+# Majority-class accuracy (1 − event rate) for the two datasets that make up the broken
+# mlp/none set (wilt, ozone-level-8hr). A degenerate classifier that predicts the
+# majority class for every instance scores exactly this on ACCURACY, and MLPClassifier's
+# early stopping monitors accuracy on its own internal validation split (early_stopping
+# =True, PREREG §4.2). A best_validation_score_ sitting on this line is therefore the
+# signature of a fit that stopped improving because "predict all-majority" already maxes
+# the monitored metric — the mechanism behind the mlp/none collapse. Values are stated in
+# the task and equal 1 − event_rate from report6 (wilt 0.0539, ozone 0.0631).
+WILT_MAJORITY_ACC: float = 0.9461  # 1 − 0.0539
+OZONE_MAJORITY_ACC: float = 0.9369  # 1 − 0.0631
 
 
 def summarize(values: np.ndarray) -> tuple[float, float, float, int]:
@@ -341,6 +358,149 @@ def _summary(
     return summ
 
 
+# --------------------------------------------------------------------------------
+# FIGURE 3 — the mechanism plot (read-only; reads the report6/7/8 CSVs, no refit)
+# --------------------------------------------------------------------------------
+def figure3_mechanism() -> Path:
+    """Figure 3 — the early-stopping mechanism, plotted from the existing diagnostic.
+
+    Report 9 currently states the mechanism only as a table. This draws it as TWO
+    panels, side by side, for the three groups (mlp/none broken, mlp/SMOTE matched,
+    mlp/none jm1 control):
+      (a) the per-replicate ``n_iter_`` distribution (box + jittered strip);
+      (b) the per-replicate ``best_validation_score_`` (box + jittered strip), with
+          HORIZONTAL REFERENCE LINES at the majority-class accuracy (1 − event rate) of
+          the two affected datasets — wilt (0.9461) and ozone (0.9369) — plus a cosmetic
+          inset that magnifies the 0.930–0.950 band so the coincidence between the broken
+          group's triangles and those reference lines is unambiguous.
+
+    Read-only: it REFITS NOTHING. It consumes the existing
+    ``results/diagnostics/report{6,7,8}_*.csv`` files (the fit path of this script wrote
+    them); the numbers are exactly those summarised in Report 9.
+
+    The story the figure makes visible: the broken group's ``n_iter_`` is pinned at the
+    floor (~12) while its ``best_validation_score_`` sits right ON the wilt/ozone
+    majority-class lines — the net stopped early because predicting all-majority already
+    maximises the accuracy it monitors. SMOTE balances the internal validation split, so
+    the majority baseline there is ~0.5, the monitored metric keeps improving, and
+    ``n_iter_`` runs much longer. jm1 (event rate ~0.19) is the high-prevalence control.
+    """
+    broken = pd.read_csv(DIAG_DIR / "report6_mlp_none_broken_refit.csv")
+    matched = pd.read_csv(DIAG_DIR / "report7_mlp_smote_matched_refit.csv")
+    jm1 = pd.read_csv(DIAG_DIR / "report8_mlp_none_jm1_control.csv")
+
+    groups = [
+        (f"mlp/none\nbroken\n(n={len(broken)})", broken, "tab:red"),
+        (f"mlp/SMOTE\nmatched\n(n={len(matched)})", matched, "tab:green"),
+        (f"mlp/none\njm1 control\n(n={len(jm1)})", jm1, "tab:blue"),
+    ]
+    positions = np.arange(len(groups), dtype=float)
+    # Explicit, seeded RNG for the cosmetic point jitter (.cursorrules: no implicit RNG).
+    rng = np.random.default_rng(config.SEEDS[0])
+
+    def _panel(ax: "plt.Axes", column: str, marker: str) -> None:
+        """Box + jittered replicate strip of ``column`` for each group on ``ax``."""
+        data = [g[1][column].to_numpy(dtype=float) for g in groups]
+        bp = ax.boxplot(
+            data,
+            positions=positions,
+            widths=0.5,
+            patch_artist=True,
+            showfliers=False,
+            medianprops=dict(color="black", lw=1.2),
+            whiskerprops=dict(color="black", lw=0.9),
+            capprops=dict(color="black", lw=0.9),
+            zorder=1,
+        )
+        for patch, (_, _, color) in zip(bp["boxes"], groups):
+            patch.set_facecolor(color)
+            patch.set_alpha(0.25)
+            patch.set_edgecolor("black")
+        for pos, (_, df, color) in zip(positions, groups):
+            vals = df[column].to_numpy(dtype=float)
+            jitter = rng.uniform(-0.11, 0.11, size=vals.size)
+            ax.scatter(
+                np.full(vals.size, pos) + jitter, vals,
+                s=26, marker=marker, color=color, edgecolor="black",
+                linewidth=0.4, alpha=0.85, zorder=3,
+            )
+        ax.set_xticks(positions)
+        ax.set_xticklabels([g[0] for g in groups], fontsize=9)
+        ax.set_xlim(-0.6, len(groups) - 0.4)
+        ax.tick_params(labelsize=8)
+
+    fig, (ax_a, ax_b) = plt.subplots(1, 2, figsize=(11.0, 5.6))
+
+    # --- panel (a): n_iter_ distribution ---
+    _panel(ax_a, "n_iter_", "o")
+    ax_a.set_ylabel("n_iter_ (iterations before early stopping)", fontsize=9)
+    ax_a.set_ylim(bottom=0.0)
+    ax_a.set_title("(a) MLP iterations before early stopping fired", fontsize=9.5)
+
+    # --- panel (b): best_validation_score_ + majority-class reference lines ---
+    _panel(ax_b, "best_val_score_", "^")
+    ax_b.axhline(WILT_MAJORITY_ACC, color="dimgray", ls="--", lw=1.3, zorder=2)
+    ax_b.axhline(OZONE_MAJORITY_ACC, color="dimgray", ls=":", lw=1.6, zorder=2)
+    ax_b.set_ylabel("best_validation_score_ (internal val accuracy)", fontsize=9)
+    ax_b.set_ylim(0.78, 1.005)
+    ax_b.set_title(
+        "(b) MLP internal-validation accuracy vs majority-class accuracy", fontsize=9.5
+    )
+    ax_b.legend(
+        handles=[
+            Line2D([0], [0], color="dimgray", ls="--", lw=1.3,
+                   label=f"wilt majority-class acc ({WILT_MAJORITY_ACC:.4f})"),
+            Line2D([0], [0], color="dimgray", ls=":", lw=1.6,
+                   label=f"ozone majority-class acc ({OZONE_MAJORITY_ACC:.4f})"),
+        ],
+        fontsize=8, loc="lower right", framealpha=0.9,
+    )
+
+    # --- cosmetic inset: magnified view of the 0.930–0.950 band ---
+    # The broken group's best_validation_score_ triangles land right on the wilt/ozone
+    # majority-class lines, which is exactly the point but hard to read at the full 0.78–
+    # 1.005 scale. This inset re-plots ONLY the broken strip and the two reference lines,
+    # zoomed to [0.930, 0.950], so the coincidence is unambiguous. It adds, drops, and
+    # recomputes NOTHING — it re-draws data already on panel (b) at a magnified scale.
+    ZOOM_LO, ZOOM_HI = 0.930, 0.950
+    axins = ax_b.inset_axes([0.50, 0.46, 0.40, 0.30])
+    broken_vals = broken["best_val_score_"].to_numpy(dtype=float)
+    # Explicit, seeded RNG for the cosmetic point jitter (.cursorrules: no implicit RNG).
+    rng_inset = np.random.default_rng(config.SEEDS[0])
+    jitter_inset = rng_inset.uniform(-0.11, 0.11, size=broken_vals.size)
+    axins.scatter(
+        jitter_inset, broken_vals,
+        s=30, marker="^", color="tab:red", edgecolor="black",
+        linewidth=0.4, alpha=0.85, zorder=3,
+    )
+    axins.axhline(WILT_MAJORITY_ACC, color="dimgray", ls="--", lw=1.3, zorder=2)
+    axins.axhline(OZONE_MAJORITY_ACC, color="dimgray", ls=":", lw=1.6, zorder=2)
+    axins.set_xlim(-0.4, 0.4)
+    axins.set_ylim(ZOOM_LO, ZOOM_HI)
+    axins.set_xticks([])
+    axins.set_yticks([OZONE_MAJORITY_ACC, WILT_MAJORITY_ACC])
+    axins.set_yticklabels(
+        [f"{OZONE_MAJORITY_ACC:.4f}", f"{WILT_MAJORITY_ACC:.4f}"], fontsize=7
+    )
+    axins.tick_params(axis="y", length=0)
+    axins.set_title("zoom: 0.930–0.950 band (broken group)", fontsize=7.5)
+    ax_b.indicate_inset_zoom(axins, edgecolor="black", lw=0.8, alpha=0.8)
+
+    fig.suptitle(
+        "Figure 3 — MLP early-stopping mechanism (read-only diagnostic, Report 9 data). "
+        "Broken mlp/none: n_iter_ pinned at the floor (a) while best_validation_score_ "
+        "sits on the\nmajority-class line (b) — the net stops because predict-all-majority "
+        "already maximises the accuracy early stopping monitors.",
+        fontsize=8.5,
+    )
+    fig.tight_layout(rect=(0, 0, 1, 0.93))
+    FIGURES_DIR.mkdir(parents=True, exist_ok=True)
+    path = FIGURES_DIR / "figure3_mlp_mechanism.png"
+    fig.savefig(path, dpi=150)
+    plt.close(fig)
+    return path
+
+
 def main() -> None:
     """Run the read-only MLP mechanism check; write results/diagnostics/, print summary."""
     results = pd.read_parquet(RESULTS_PATH)
@@ -351,6 +511,7 @@ def main() -> None:
     matched_smote = report7_matched_smote(broken)
     jm1 = report8_control_jm1(results)
     _summary(broken_none, matched_smote, jm1)
+    fig3 = figure3_mechanism()
 
     n_broken = len(broken_none)
     n_match = int((broken_none["exact_match"] == "yes").sum()) + int(
@@ -361,7 +522,7 @@ def main() -> None:
         f"verify_mlp_mechanism: refit {n_broken} broken mlp/none + {len(matched_smote)} "
         f"matched mlp/smote + {len(jm1)} jm1 control (mlp/none). "
         f"Exact-AUROC-match {n_match}/{n_checked}. "
-        f"Tables -> {DIAG_DIR}/ (report6..report9)."
+        f"Tables -> {DIAG_DIR}/ (report6..report9); Figure -> {fig3.name}."
     )
 
 
