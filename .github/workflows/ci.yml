@@ -12,6 +12,6 @@ jobs:
         with:
           python-version: "3.11"
           cache: pip
-      - run: pip install -r requirements.lock.txt
+      - run: pip install -r requirements.txt
       - run: python -c "import numpy, statsmodels.api, xgboost, imblearn"
       - run: pytest -q
