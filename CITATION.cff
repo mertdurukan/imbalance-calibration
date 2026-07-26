@@ -6,6 +6,6 @@ authors:
     given-names: "Mert"
 title: "Class-imbalance corrections in tabular machine learning: a pre-registered evaluation"
 version: "1.0.0"
-date-released: "2026-07-12"
+date-released: "2026-07-15"
 url: "https://github.com/mertdurukan/imbalance-calibration"
 license: MIT

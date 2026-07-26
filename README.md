@@ -1,5 +1,8 @@
 # Class-imbalance corrections in modern tabular ML
 
+[![CI](https://img.shields.io/github/actions/workflow/status/mertdurukan/imbalance-calibration/ci.yml?branch=main&label=CI)](https://github.com/mertdurukan/imbalance-calibration/actions/workflows/ci.yml)
+[![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
+
 A pre-registered study of whether random undersampling (RUS), random oversampling (ROS),
 and SMOTE help logistic regression, XGBoost, and an MLP on imbalanced tabular data. Across
 **8 OpenML datasets** (event rate 5–19%), 3 models, 4 resampling conditions, and 5×5
