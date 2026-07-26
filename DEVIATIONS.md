@@ -76,3 +76,14 @@ Format:
 - **Ordering note:** the pre-registered Tables 1–3 (`src/analyze.py`) were regenerated and reported to the author BEFORE this mechanism diagnostic was discussed, correcting the earlier ordering in which diagnostics were seen first.
 - **Decided:** AFTER seeing results. Disclosed as such.
 - **Impact on hypotheses:** none. The pre-registered result stands exactly as computed; this diagnostic explains the MLP H1 FAIL, it does not replace it. The post-hoc exclusion recompute remains EXPLORATORY and clearly labelled (`scripts/diagnose_mlp.py` Report 5).
+
+## Repository re-creation (2026-07-26)
+
+The GitHub repository was deleted and re-created under the same name on
+2026-07-26 to clear a stale cached contributor entry that GitHub Support could
+not correct. The git history was pushed back unchanged: all commits, authors,
+dates, messages, and the `v1.0.0` tag are identical to the original. No commit
+was rewritten, added, or removed. As a consequence the repository's GitHub
+creation date now reads 2026-07-26 rather than the original date; the commit
+timestamps in the history remain the authoritative record. A `--mirror` backup
+of the original repository is retained offline.
